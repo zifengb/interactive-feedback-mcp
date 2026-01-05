@@ -1,6 +1,6 @@
 # 🗣️ Interactive Feedback MCP
 
-[中文文档](./README.zh-CN.md)
+[中文文档](./README.md)
 
 Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-loop workflow in AI-assisted development tools like [Cursor](https://www.cursor.com), [Cline](https://cline.bot) and [Windsurf](https://windsurf.com). This server allows you to easily provide feedback directly to the AI agent, bridging the gap between AI and you.
 
@@ -11,6 +11,7 @@ Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-l
 - Beautiful UI
 - Support pasting images
 - Support markdown format
+- **🚀 v0.2.0: Multi-Agent Async Mode** - Support multiple AI Agents requesting user feedback simultaneously without blocking each other
 
 ## 🖼️ Example
 
@@ -33,9 +34,24 @@ Essentially, this helps your AI assistant _ask for clarification instead of gues
 
 ## 🛠️ Tools
 
-This server exposes the following tool via the Model Context Protocol (MCP):
+This server exposes the following tools via the Model Context Protocol (MCP):
 
-- `interactive_feedback`: Asks the user a question and returns their answer. Can display predefined options.
+### Standard Mode (`server.py`)
+
+- `interactive_feedback`: Asks the user a question and returns their answer. Can display predefined options. (Blocking)
+
+### Async Mode (`server_async.py`) - New in v0.2.0
+
+Non-blocking feedback tools for multi-Agent concurrency:
+
+| Tool | Description |
+|------|-------------|
+| `start_feedback` | Non-blocking launch feedback UI, returns request_id immediately |
+| `check_feedback` | Check the status of a feedback request |
+| `get_feedback` | Get the completed feedback result |
+| `cancel_feedback` | Cancel an ongoing feedback request |
+| `list_pending_feedbacks` | List all pending feedback requests |
+| `interactive_feedback` | Compatibility mode, same behavior as standard mode |
 
 ## 📦 Installation
 
@@ -52,8 +68,11 @@ This server exposes the following tool via the Model Context Protocol (MCP):
 
 ## ⚙️ Configuration
 
-1. Add the following configuration to your `claude_desktop_config.json` (Claude Desktop) or `mcp.json` (Cursor):
-   **Remember to change the `/path/to/interactive-feedback-mcp` path to the actual path where you cloned the repository on your system.**
+Add the following configuration to your `claude_desktop_config.json` (Claude Desktop) or `mcp.json` (Cursor):
+
+**Remember to change the `/path/to/interactive-feedback-mcp` path to the actual path where you cloned the repository on your system.**
+
+### Standard Mode Configuration
 
 ```json
 {
@@ -68,13 +87,126 @@ This server exposes the following tool via the Model Context Protocol (MCP):
 }
 ```
 
-2. Add the following to the custom rules in your AI assistant (in Cursor Settings > Rules > User Rules):
+### Async Mode Configuration (Recommended for Multi-Agent)
+
+```json
+{
+  "mcpServers": {
+    "interactive-feedback": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/interactive-feedback-mcp", "run", "server_async.py"],
+      "timeout": 600,
+      "autoApprove": [
+        "interactive_feedback",
+        "start_feedback",
+        "check_feedback",
+        "get_feedback",
+        "cancel_feedback",
+        "list_pending_feedbacks"
+      ]
+    }
+  }
+}
+```
+
+### Add AI Assistant Rules
+
+Add the following to the custom rules in your AI assistant (in Cursor Settings > Rules > User Rules):
 
 > If requirements or instructions are unclear use the tool interactive_feedback to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the interactive_feedback MCP tool to facilitate quick decisions.
 
 > Whenever you're about to complete a user request, call the interactive_feedback tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.
 
 This will ensure your AI assistant always uses this MCP server to request user feedback when the prompt is unclear and before marking the task as completed.
+
+## 🚀 Async Mode Usage
+
+Async mode (`server_async.py`) is designed for multi-Agent concurrent scenarios:
+
+### Features
+
+- **Non-blocking calls**: `start_feedback` returns immediately without blocking other Agents
+- **Multi-window support**: Support displaying multiple feedback UI windows simultaneously
+- **Request tracking**: Each request has a unique ID for status tracking
+- **Auto cleanup**: Expired requests and temporary files are automatically cleaned up
+- **Concurrency limit**: Supports up to 10 concurrent feedback requests
+
+### Workflow
+
+```
+Agent A                          Agent B
+   |                                |
+   |-- start_feedback() -->        |
+   |   returns request_id_A        |-- start_feedback() -->
+   |                               |   returns request_id_B
+   |-- check_feedback(A) -->       |
+   |   status: pending             |-- check_feedback(B) -->
+   |                               |   status: pending
+   |   [User completes A]          |
+   |-- check_feedback(A) -->       |
+   |   status: completed           |
+   |-- get_feedback(A) -->         |   [User completes B]
+   |   returns user feedback       |-- get_feedback(B) -->
+   |                               |   returns user feedback
+```
+
+## 🧪 Testing
+
+Before configuring MCP, you can manually test whether each component is working properly.
+
+### Test UI Interface
+
+Run the UI test directly to check if the feedback window displays correctly:
+
+```bash
+# Navigate to project directory
+cd /path/to/interactive-feedback-mcp
+
+# Test UI (will pop up a feedback window)
+uv run feedback_ui.py --prompt "This is a test message with **Markdown** support" --predefined-options "Option A|||Option B|||Option C"
+```
+
+If the window pops up normally and you can input feedback, the UI component is working correctly.
+
+### Test MCP Server
+
+Use `fastmcp` dev mode to test the MCP server:
+
+```bash
+# Test standard mode server
+uv run fastmcp dev server.py
+
+# Test async mode server
+uv run fastmcp dev server_async.py
+```
+
+This will start an interactive MCP testing environment where you can directly call tools for testing.
+
+### Run Unit Tests
+
+The project includes a complete test suite:
+
+```bash
+# Install test dependencies
+uv pip install pytest pytest-asyncio
+
+# Run all tests
+uv run pytest tests/ -v
+
+# Run specific test files
+uv run pytest tests/test_request_manager.py -v
+uv run pytest tests/test_async_launcher.py -v
+uv run pytest tests/test_integration.py -v
+```
+
+### Troubleshooting
+
+| Issue | Possible Cause | Solution |
+|-------|----------------|----------|
+| UI window not showing | Missing PySide6 | Run `uv pip install pyside6` |
+| Garbled text display | Font issue | Ensure system has proper fonts installed |
+| MCP connection failed | Path configuration error | Check if the path in mcp.json is correct |
+| Process won't start | Python environment issue | Make sure to use `uv run` to execute |
 
 ## 🙏 Acknowledgements
 
