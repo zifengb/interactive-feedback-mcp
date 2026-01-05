@@ -773,6 +773,52 @@ shortcut.activated.connect(self.my_custom_action)
 
 ---
 
+## 🚀 多实例非阻塞改造方案
+
+> 📄 **详细方案文档**: [MULTI_AGENT_PLAN.md](./MULTI_AGENT_PLAN.md)
+
+当前架构采用阻塞式设计，不支持 Cursor 多 Agent 并发场景。为此，我们设计了一套非阻塞改造方案。
+
+### 问题概述
+
+```mermaid
+graph LR
+    subgraph "当前问题"
+        A[Agent A 调用] -->|"阻塞"| B[等待用户...]
+        C[Agent B 调用] -.->|"必须等待"| B
+    end
+    
+    style B fill:#ffcdd2
+```
+
+### 改造方向
+
+```mermaid
+graph LR
+    subgraph "目标架构"
+        A1[Agent A] -->|"非阻塞"| S[Server]
+        A2[Agent B] -->|"非阻塞"| S
+        S --> U1[UI 窗口 A]
+        S --> U2[UI 窗口 B]
+    end
+    
+    style S fill:#c8e6c9
+```
+
+### 新增工具预览
+
+| 工具 | 功能 | 说明 |
+|------|------|------|
+| `start_feedback` | 启动反馈 UI | 非阻塞，立即返回 request_id |
+| `check_feedback` | 检查状态 | pending / completed / cancelled |
+| `get_feedback` | 获取结果 | 返回文本和图片 |
+| `cancel_feedback` | 取消请求 | 关闭 UI 窗口 |
+| `list_pending_feedbacks` | 列出待处理 | 查看所有活跃请求 |
+
+👉 **完整实施方案、代码示例、迁移指南请参阅 [MULTI_AGENT_PLAN.md](./MULTI_AGENT_PLAN.md)**
+
+---
+
 ## 附录
 
 ### 工具参数说明
