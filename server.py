@@ -10,7 +10,8 @@ import subprocess
 import base64
 from typing import Annotated, Dict, Tuple, List
 
-from fastmcp import FastMCP, Image
+from fastmcp import FastMCP
+from fastmcp.utilities.types import Image
 from pydantic import Field
 
 # The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81

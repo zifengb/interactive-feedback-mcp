@@ -1,7 +1,7 @@
 [project]
 name = "interactive-feedback-mcp"
-version = "0.1.5"
-description = "MCP server for interactive user feedback and command execution in AI-assisted development, by Fábio Ferreira and Pau Oliva."
+version = "0.2.0"
+description = "MCP server for interactive user feedback and command execution in AI-assisted development, by Fábio Ferreira and Pau Oliva. Now with multi-agent async support."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -9,4 +9,10 @@ dependencies = [
     "psutil>=7.0.0",
     "pyside6>=6.8.2.1",
     "markdown>=3.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
 ]
