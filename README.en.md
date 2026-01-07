@@ -38,20 +38,18 @@ This server exposes the following tools via the Model Context Protocol (MCP):
 
 ### Standard Mode (`server.py`)
 
-- `interactive_feedback`: Asks the user a question and returns their answer. Can display predefined options. (Blocking)
+- `interactive_feedback`: Asks the user a question and returns their answer. Can display predefined options. (Blocking, single Agent)
 
-### Async Mode (`server_async.py`) - New in v0.2.0
+### Async Mode (`server_async.py`) - New in v0.2.0 (Recommended)
 
-Non-blocking feedback tools for multi-Agent concurrency:
+Feedback tools supporting multi-Agent concurrency:
 
 | Tool | Description |
 |------|-------------|
-| `start_feedback` | Non-blocking launch feedback UI, returns request_id immediately |
-| `check_feedback` | Check the status of a feedback request |
-| `get_feedback` | Get the completed feedback result |
-| `cancel_feedback` | Cancel an ongoing feedback request |
-| `list_pending_feedbacks` | List all pending feedback requests |
+| `start_feedback` | Launch feedback UI and wait for user to complete, returns feedback result (supports multi-Agent concurrency) |
 | `interactive_feedback` | Compatibility mode, same behavior as standard mode |
+
+**Note**: In async mode, each Agent calling `start_feedback` will wait for its own UI window, but won't block the Server process, allowing multiple Agents to pop up their own feedback windows simultaneously.
 
 ## 📦 Installation
 
@@ -98,24 +96,28 @@ Add the following configuration to your `claude_desktop_config.json` (Claude Des
       "timeout": 600,
       "autoApprove": [
         "interactive_feedback",
-        "start_feedback",
-        "check_feedback",
-        "get_feedback",
-        "cancel_feedback",
-        "list_pending_feedbacks"
+        "start_feedback"
       ]
     }
   }
 }
 ```
 
-### Add AI Assistant Rules
+### Add AI Assistant Rules (Single Instance)
 
 Add the following to the custom rules in your AI assistant (in Cursor Settings > Rules > User Rules):
 
 > If requirements or instructions are unclear use the tool interactive_feedback to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the interactive_feedback MCP tool to facilitate quick decisions.
 
 > Whenever you're about to complete a user request, call the interactive_feedback tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.
+
+### Add AI Assistant Rules (Multi Instance)
+
+在您的 AI 助手（在 Cursor Settings > Rules > User Rules 中）的全局自定义规则中添加以下内容：
+
+> If requirements or instructions are unclear use the tool start_feedback to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the start_feedback MCP tool to facilitate quick decisions.
+
+> Whenever you're about to complete a user request, call the start_feedback tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.
 
 This will ensure your AI assistant always uses this MCP server to request user feedback when the prompt is unclear and before marking the task as completed.
 
@@ -125,11 +127,10 @@ Async mode (`server_async.py`) is designed for multi-Agent concurrent scenarios:
 
 ### Features
 
-- **Non-blocking calls**: `start_feedback` returns immediately without blocking other Agents
-- **Multi-window support**: Support displaying multiple feedback UI windows simultaneously
-- **Request tracking**: Each request has a unique ID for status tracking
-- **Auto cleanup**: Expired requests and temporary files are automatically cleaned up
-- **Concurrency limit**: Supports up to 10 concurrent feedback requests
+- **Multi-window support**: Multiple Agents can pop up their own feedback UI windows simultaneously
+- **Session persistence**: Each Agent calling `start_feedback` will wait for user to complete feedback, session won't be interrupted
+- **Server not blocked**: Implemented with asyncio, the Server process itself won't be blocked
+- **Auto cleanup**: Temporary files are automatically cleaned up
 
 ### Workflow
 
@@ -137,18 +138,19 @@ Async mode (`server_async.py`) is designed for multi-Agent concurrent scenarios:
 Agent A                          Agent B
    |                                |
    |-- start_feedback() -->        |
-   |   returns request_id_A        |-- start_feedback() -->
-   |                               |   returns request_id_B
-   |-- check_feedback(A) -->       |
-   |   status: pending             |-- check_feedback(B) -->
-   |                               |   status: pending
+   |   [Pop up UI window A]        |-- start_feedback() -->
+   |   [Waiting for user...]       |   [Pop up UI window B]
+   |                               |   [Waiting for user...]
    |   [User completes A]          |
-   |-- check_feedback(A) -->       |
-   |   status: completed           |
-   |-- get_feedback(A) -->         |   [User completes B]
-   |   returns user feedback       |-- get_feedback(B) -->
-   |                               |   returns user feedback
+   |<-- returns user feedback      |
+   |   [Agent A continues]         |   [User completes B]
+   |                               |<-- returns user feedback
+   |                               |   [Agent B continues]
 ```
+
+Difference from standard mode:
+- **Standard mode**: Uses `subprocess.run()` to wait synchronously, blocks the entire Server process
+- **Async mode**: Uses `asyncio` to wait asynchronously, each Agent waits for its own UI without affecting others
 
 ## 🧪 Testing
 

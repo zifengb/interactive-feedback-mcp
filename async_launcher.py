@@ -3,7 +3,7 @@ async_launcher.py - 异步 UI 启动器
 职责：非阻塞启动和监控 feedback_ui.py 进程
 
 支持功能：
-- 非阻塞启动 UI 进程
+- 非阻塞启动 UI 进程（不阻塞 Server，但支持异步等待结果）
 - 后台监控进程状态
 - 收集反馈结果
 - [P0] 轮询间隔优化为 1.0 秒
@@ -16,7 +16,7 @@ import asyncio
 import tempfile
 import subprocess
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
 from request_manager import RequestManager, RequestStatus
@@ -274,4 +274,108 @@ class AsyncUILauncher:
         
         logger.info(f"已取消 {cancelled_count} 个请求")
         return cancelled_count
+    
+    async def launch_and_wait(
+        self,
+        message: str,
+        predefined_options: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        启动反馈 UI 并异步等待用户完成
+        
+        这个方法会阻塞当前协程直到用户完成反馈，但不会阻塞 Server 进程，
+        允许其他 Agent 同时调用并各自等待自己的 UI。
+        
+        Args:
+            message: 显示给用户的消息
+            predefined_options: 预设选项
+            
+        Returns:
+            用户反馈结果字典，包含 interactive_feedback 和 images 字段
+            如果用户取消或出错，返回空字典
+        """
+        # 1. 创建唯一的临时输出文件
+        try:
+            fd, output_file = tempfile.mkstemp(
+                suffix=".json",
+                prefix="feedback_"
+            )
+            os.close(fd)
+        except Exception as e:
+            logger.error(f"创建临时文件失败: {e}")
+            return {}
+        
+        # 2. 构建命令参数
+        args = [
+            sys.executable,
+            "-u",
+            str(self.feedback_ui_path),
+            "--prompt", message,
+            "--output-file", output_file,
+            "--predefined-options", 
+            "|||".join(predefined_options) if predefined_options else ""
+        ]
+        
+        process = None
+        try:
+            # 3. 非阻塞启动进程
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = subprocess.CREATE_NO_WINDOW
+            
+            process = subprocess.Popen(
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=creation_flags
+            )
+            
+            logger.info(f"UI 进程已启动，pid={process.pid}")
+            
+            # 4. 异步等待进程完成（不阻塞 Server）
+            while process.poll() is None:
+                await asyncio.sleep(self.poll_interval)
+            
+            # 5. 进程已结束，检查结果
+            exit_code = process.returncode
+            logger.info(f"UI 进程已退出，exit_code={exit_code}")
+            
+            if exit_code == 0 and os.path.exists(output_file):
+                # 正常退出，读取结果
+                try:
+                    with open(output_file, 'r', encoding='utf-8') as f:
+                        result = json.load(f)
+                    logger.info("用户反馈已获取")
+                    return result
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.error(f"读取结果失败: {e}")
+                    return {}
+            else:
+                # 用户关闭窗口或异常退出
+                logger.info("用户取消或窗口被关闭")
+                return {}
+                
+        except asyncio.CancelledError:
+            # 任务被取消，终止进程
+            if process and process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            logger.info("等待被取消")
+            raise
+            
+        except Exception as e:
+            logger.error(f"启动或等待 UI 失败: {e}")
+            return {}
+            
+        finally:
+            # 清理临时文件
+            if os.path.exists(output_file):
+                try:
+                    os.unlink(output_file)
+                except Exception as e:
+                    logger.warning(f"清理临时文件失败: {e}")
 

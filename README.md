@@ -40,20 +40,18 @@
 
 ### 标准模式 (`server.py`)
 
-- `interactive_feedback`：向用户提问并返回用户的答案。可以显示预设选项。（阻塞式）
+- `interactive_feedback`：向用户提问并返回用户的答案。可以显示预设选项。（阻塞式，单 Agent）
 
-### 异步模式 (`server_async.py`) - v0.2.0 新增
+### 异步模式 (`server_async.py`) - v0.2.0 新增（推荐）
 
-支持多 Agent 并发的非阻塞反馈工具：
+支持多 Agent 并发的反馈工具：
 
 | 工具 | 说明 |
 |------|------|
-| `start_feedback` | 非阻塞启动反馈 UI，立即返回 request_id |
-| `check_feedback` | 检查反馈请求的状态 |
-| `get_feedback` | 获取已完成的反馈结果 |
-| `cancel_feedback` | 取消正在进行的反馈请求 |
-| `list_pending_feedbacks` | 列出所有待处理的反馈请求 |
+| `start_feedback` | 启动反馈 UI 并等待用户完成，返回反馈结果（支持多 Agent 并发） |
 | `interactive_feedback` | 兼容模式，与标准模式行为一致 |
+
+**注意**：异步模式下，每个 Agent 调用 `start_feedback` 后会各自等待自己的 UI 窗口，但不会阻塞 Server 进程，因此多个 Agent 可以同时弹出各自的反馈窗口。
 
 ## 📦 安装
 
@@ -99,11 +97,7 @@
       "timeout": 600,
       "autoApprove": [
         "interactive_feedback",
-        "start_feedback",
-        "check_feedback",
-        "get_feedback",
-        "cancel_feedback",
-        "list_pending_feedbacks"
+        "start_feedback"
       ]
     }
   }
@@ -114,13 +108,21 @@
 
 ![启动命令](./help.png)
 
-### 添加 AI 助手规则
+### 添加 AI 助手规则（单实例）
 
 在您的 AI 助手（在 Cursor Settings > Rules > User Rules 中）的全局自定义规则中添加以下内容：
 
 > If requirements or instructions are unclear use the tool interactive_feedback to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the interactive_feedback MCP tool to facilitate quick decisions.
 
 > Whenever you're about to complete a user request, call the interactive_feedback tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.
+
+### 添加 AI 助手规则（多实例）
+
+在您的 AI 助手（在 Cursor Settings > Rules > User Rules 中）的全局自定义规则中添加以下内容：
+
+> If requirements or instructions are unclear use the tool start_feedback to ask clarifying questions to the user before proceeding, do not make assumptions. Whenever possible, present the user with predefined options through the start_feedback MCP tool to facilitate quick decisions.
+
+> Whenever you're about to complete a user request, call the start_feedback tool to request user feedback before ending the process. If the feedback is empty you can end the request and don't call the tool in loop.
 
 这将确保 cursor 在你提问的问题不明确时以及在将任务即将完成之前始终使用此 MCP 服务器来请求用户反馈。
 
@@ -130,11 +132,10 @@
 
 ### 特性
 
-- **非阻塞调用**：`start_feedback` 立即返回，不会阻塞其他 Agent
-- **多窗口支持**：支持同时显示多个反馈 UI 窗口
-- **请求追踪**：每个请求有唯一 ID，可追踪状态
-- **自动清理**：过期请求和临时文件自动清理
-- **并发限制**：最多支持 10 个并发反馈请求
+- **多窗口支持**：多个 Agent 可以同时弹出各自的反馈 UI 窗口
+- **会话保持**：每个 Agent 调用 `start_feedback` 后会等待用户完成反馈，会话不会中断
+- **Server 不阻塞**：使用 asyncio 实现，Server 进程本身不会被阻塞
+- **自动清理**：临时文件自动清理
 
 ### 工作流程
 
@@ -142,18 +143,19 @@
 Agent A                          Agent B
    |                                |
    |-- start_feedback() -->        |
-   |   返回 request_id_A           |-- start_feedback() -->
-   |                               |   返回 request_id_B
-   |-- check_feedback(A) -->       |
-   |   status: pending             |-- check_feedback(B) -->
-   |                               |   status: pending
+   |   [弹出 UI 窗口 A]             |-- start_feedback() -->
+   |   [等待用户...]               |   [弹出 UI 窗口 B]
+   |                               |   [等待用户...]
    |   [用户完成 A 的反馈]           |
-   |-- check_feedback(A) -->       |
-   |   status: completed           |
-   |-- get_feedback(A) -->         |   [用户完成 B 的反馈]
-   |   返回用户反馈                  |-- get_feedback(B) -->
-   |                               |   返回用户反馈
+   |<-- 返回用户反馈                 |
+   |   [Agent A 继续工作]           |   [用户完成 B 的反馈]
+   |                               |<-- 返回用户反馈
+   |                               |   [Agent B 继续工作]
 ```
+
+与标准模式的区别：
+- **标准模式**：使用 `subprocess.run()` 同步等待，会阻塞整个 Server 进程
+- **异步模式**：使用 `asyncio` 异步等待，每个 Agent 各自等待自己的 UI，互不影响
 
 ## 🧪 测试
 
