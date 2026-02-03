@@ -887,6 +887,11 @@ class FeedbackUI(QMainWindow):
         final_feedback = "\n\n".join(final_feedback_parts)
         images_b64 = [img['base64'] for img in image_data]
 
+        # 将反馈文本复制到系统剪贴板
+        if final_feedback:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(final_feedback)
+
         self.feedback_result = FeedbackResult(
             interactive_feedback=final_feedback,
             images=images_b64
