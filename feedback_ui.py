@@ -178,14 +178,17 @@ class FeedbackUI(QMainWindow):
     # 缓存Markdown实例
     _markdown_instance = None
 
-    def __init__(self, prompt: str, predefined_options: Optional[List[str]] = None):
+    DEFAULT_TITLE = "Cursor 交互式反馈 MCP"
+    MAX_TITLE_LEN = 50
+
+    def __init__(self, prompt: str, predefined_options: Optional[List[str]] = None, window_title: Optional[str] = None):
         super().__init__()
         self.prompt = prompt
         self.predefined_options = predefined_options or []
 
         self.feedback_result = None
 
-        self.setWindowTitle("Cursor 交互式反馈 MCP")
+        self.setWindowTitle(self._get_display_title(window_title))
         script_dir = os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(script_dir, "images", "feedback.png")
         self.setWindowIcon(QIcon(icon_path))
@@ -218,6 +221,16 @@ class FeedbackUI(QMainWindow):
 
         self._create_ui()
         self._setup_shortcuts()  # 添加快捷键设置
+
+    def _get_display_title(self, title: Optional[str]) -> str:
+        if not title or not title.strip():
+            return self.DEFAULT_TITLE
+
+        title = title.strip()
+        if len(title) > self.MAX_TITLE_LEN:
+            title = title[:self.MAX_TITLE_LEN] + "..."
+
+        return f"{title} - 反馈"
 
     def _preprocess_text(self, text: str) -> str:
         """
@@ -1063,7 +1076,7 @@ class FeedbackUI(QMainWindow):
             # 如果布局为空，直接添加图片
             self.images_layout.addWidget(image_frame)
 
-def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, output_file: Optional[str] = None) -> Optional[FeedbackResult]:
+def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, output_file: Optional[str] = None, window_title: Optional[str] = None) -> Optional[FeedbackResult]:
     # ----- 开启高 DPI 缩放 -----
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
@@ -1078,7 +1091,7 @@ def feedback_ui(prompt: str, predefined_options: Optional[List[str]] = None, out
     default_font.setPointSize(15)       # 设定全局字号为 11pt，按需修改
     app.setFont(default_font)
 
-    ui = FeedbackUI(prompt, predefined_options)
+    ui = FeedbackUI(prompt, predefined_options, window_title)
     result = ui.run()
 
     if output_file and result:
@@ -1096,11 +1109,12 @@ if __name__ == "__main__":
     parser.add_argument("--prompt", default="我已经根据您的请求完成了修改。", help="要向用户显示的提示信息")
     parser.add_argument("--predefined-options", default="", help="竖线分隔的预设选项列表 (|||)")
     parser.add_argument("--output-file", help="保存反馈结果的 JSON 文件路径")
+    parser.add_argument("--window-title", default=None, help="窗口标题，用于显示会话主题")
     args = parser.parse_args()
 
     predefined_options = [opt for opt in args.predefined_options.split("|||") if opt] if args.predefined_options else None
 
-    result = feedback_ui(args.prompt, predefined_options, args.output_file)
+    result = feedback_ui(args.prompt, predefined_options, args.output_file, args.window_title)
     if result:
         print(f"\n收到的反馈:\n{result['interactive_feedback']}")
     sys.exit(0)

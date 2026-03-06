@@ -376,7 +376,7 @@ sequenceDiagram
     
     Note over AI: AI 判断需要更多信息
     
-    AI->>MCP: 调用 interactive_feedback<br/>message: "请问需要哪种排序算法？"<br/>predefined_options: ["快速排序", "归并排序", "堆排序"]
+    AI->>MCP: 调用 interactive_feedback<br/>message: "请问需要哪种排序算法？"<br/>predefined_options: ["快速排序", "归并排序", "堆排序"]<br/>window_title: "实现排序算法"
     
     MCP->>File: 创建临时 JSON 文件
     MCP->>UI: subprocess.run()<br/>传递 --prompt, --predefined-options, --output-file
@@ -482,6 +482,7 @@ classDiagram
     class FeedbackUI {
         -prompt: str
         -predefined_options: List~str~
+        -window_title: Optional~str~
         -feedback_result: FeedbackResult
         -settings: QSettings
         -line_height: float
@@ -489,7 +490,8 @@ classDiagram
         -feedback_text: FeedbackTextEdit
         -option_checkboxes: List~QCheckBox~
         -images_container: QFrame
-        +__init__(prompt, predefined_options)
+        +__init__(prompt, predefined_options, window_title)
+        +_get_display_title(title) str
         +run() FeedbackResult
         -_create_ui()
         -_setup_shortcuts()
@@ -555,6 +557,7 @@ flowchart LR
         Prompt["--prompt<br/>问题文本"]
         Options["--predefined-options<br/>预设选项 (|||分隔)"]
         Output["--output-file<br/>输出文件路径"]
+        Title["--window-title<br/>窗口标题(可选)"]
     end
     
     subgraph UI进程
@@ -562,14 +565,16 @@ flowchart LR
         Window[创建窗口]
     end
     
-    Request -->|"message, predefined_options"| Tool
+    Request -->|"message, predefined_options, window_title"| Tool
     Tool --> Launch
     Launch --> Prompt
     Launch --> Options
     Launch --> Output
+    Launch --> Title
     Prompt --> Parse
     Options --> Parse
     Output --> Parse
+    Title --> Parse
     Parse --> Window
 ```
 
@@ -825,8 +830,9 @@ graph LR
 
 ```
 interactive_feedback(
-    message: str,           # 必填：显示给用户的问题或提示
-    predefined_options: list # 可选：预设选项列表，方便快速选择
+    message: str,                    # 必填：显示给用户的问题或提示
+    predefined_options: list = None, # 可选：预设选项列表，方便快速选择
+    window_title: str = None         # 可选：反馈窗口标题，建议传入会话主题摘要（≤30字符）
 ) -> Tuple[str | Image, ...]
 ```
 

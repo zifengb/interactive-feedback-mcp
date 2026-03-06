@@ -17,7 +17,7 @@ from pydantic import Field
 # The log_level is necessary for Cline to work: https://github.com/jlowin/fastmcp/issues/81
 mcp = FastMCP("Interactive Feedback MCP", log_level="ERROR")
 
-def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None) -> dict[str, str]:
+def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None, window_title: str | None = None) -> dict[str, str]:
     # Create a temporary file for the feedback result
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         output_file = tmp.name
@@ -38,6 +38,8 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
             "--output-file", output_file,
             "--predefined-options", "|||".join(predefinedOptions) if predefinedOptions else ""
         ]
+        if window_title:
+            args.extend(["--window-title", window_title])
         result = subprocess.run(
             args,
             check=False,
@@ -64,12 +66,13 @@ def launch_feedback_ui(summary: str, predefinedOptions: list[str] | None = None)
 def interactive_feedback(
     message: str = Field(description="The specific question for the user"),
     predefined_options: list = Field(default=None, description="Predefined options for the user to choose from (optional)"),
+    window_title: str = Field(default=None, description="Window title. Pass the current session topic or task summary for display in the feedback window title bar. Keep it concise, ideally under 30 characters."),
 ) -> Tuple[str | Image, ...]:
     """
     Request interactive feedback from the user.
     """
     predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
-    result_dict = launch_feedback_ui(message, predefined_options_list)
+    result_dict = launch_feedback_ui(message, predefined_options_list, window_title)
 
     txt: str = result_dict.get("interactive_feedback", "").strip()
     img_b64_list: List[str] = result_dict.get("images", [])

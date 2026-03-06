@@ -12,6 +12,7 @@ Simple [MCP Server](https://modelcontextprotocol.io/) to enable a human-in-the-l
 - Support pasting images
 - Support markdown format
 - **🚀 v0.2.0: Multi-Agent Async Mode** - Support multiple AI Agents requesting user feedback simultaneously without blocking each other
+- **🏷️ Dynamic Window Title** - Feedback window title can display current session topic for better multi-window identification
 
 ## 🖼️ Example
 
@@ -48,6 +49,14 @@ Feedback tools supporting multi-Agent concurrency:
 |------|-------------|
 | `start_feedback` | Launch feedback UI and wait for user to complete, returns feedback result (supports multi-Agent concurrency) |
 | `interactive_feedback` | Compatibility mode, same behavior as standard mode |
+
+#### Tool Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `message` | `str` | Yes | The question or prompt to display to the user |
+| `predefined_options` | `list[str]` | No | Predefined options for quick selection |
+| `window_title` | `str` | No | Feedback window title, suggest passing current session topic summary (≤30 chars) |
 
 **Note**: In async mode, each Agent calling `start_feedback` will wait for its own UI window, but won't block the Server process, allowing multiple Agents to pop up their own feedback windows simultaneously.
 
@@ -166,6 +175,9 @@ cd /path/to/interactive-feedback-mcp
 
 # Test UI (will pop up a feedback window)
 uv run feedback_ui.py --prompt "This is a test message with **Markdown** support" --predefined-options "Option A|||Option B|||Option C"
+
+# Test custom window title
+uv run feedback_ui.py --prompt "Please confirm the changes" --window-title "Refactor Auth Module"
 ```
 
 If the window pops up normally and you can input feedback, the UI component is working correctly.

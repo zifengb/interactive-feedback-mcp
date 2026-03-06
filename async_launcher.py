@@ -51,7 +51,8 @@ class AsyncUILauncher:
         self,
         request_id: str,
         message: str,
-        predefined_options: Optional[List[str]] = None
+        predefined_options: Optional[List[str]] = None,
+        window_title: Optional[str] = None
     ) -> bool:
         """
         非阻塞启动反馈 UI
@@ -96,6 +97,8 @@ class AsyncUILauncher:
             "--predefined-options", 
             "|||".join(predefined_options) if predefined_options else ""
         ]
+        if window_title:
+            args.extend(["--window-title", window_title])
         
         try:
             # 4. 非阻塞启动进程
@@ -278,7 +281,8 @@ class AsyncUILauncher:
     async def launch_and_wait(
         self,
         message: str,
-        predefined_options: Optional[List[str]] = None
+        predefined_options: Optional[List[str]] = None,
+        window_title: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         启动反馈 UI 并异步等待用户完成
@@ -315,6 +319,8 @@ class AsyncUILauncher:
             "--predefined-options", 
             "|||".join(predefined_options) if predefined_options else ""
         ]
+        if window_title:
+            args.extend(["--window-title", window_title])
         
         process = None
         try:

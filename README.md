@@ -14,6 +14,7 @@
 - 支持粘贴图片
 - 支持 markdown 格式，支持 emoji
 - **🚀 v0.2.0 新增：多 Agent 非阻塞模式** - 支持多个 AI Agent 同时请求用户反馈，不再互相阻塞
+- **🏷️ 动态窗口标题** - 反馈窗口标题可显示当前会话主题，便于多窗口辨识
 
 ## 🖼️ 示例
 
@@ -50,6 +51,14 @@
 |------|------|
 | `start_feedback` | 启动反馈 UI 并等待用户完成，返回反馈结果（支持多 Agent 并发） |
 | `interactive_feedback` | 兼容模式，与标准模式行为一致 |
+
+#### 工具参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `message` | `str` | 是 | 显示给用户的问题或提示 |
+| `predefined_options` | `list[str]` | 否 | 预设选项列表，方便用户快速选择 |
+| `window_title` | `str` | 否 | 反馈窗口标题，建议传入当前会话的主题摘要（≤30字符） |
 
 **注意**：异步模式下，每个 Agent 调用 `start_feedback` 后会各自等待自己的 UI 窗口，但不会阻塞 Server 进程，因此多个 Agent 可以同时弹出各自的反馈窗口。
 
@@ -171,6 +180,9 @@ cd /path/to/interactive-feedback-mcp
 
 # 测试 UI（会弹出反馈窗口）
 uv run feedback_ui.py --prompt "这是一个测试消息，支持 **Markdown** 格式" --predefined-options "选项A|||选项B|||选项C"
+
+# 测试自定义窗口标题
+uv run feedback_ui.py --prompt "请确认修改方案" --window-title "重构用户认证模块"
 ```
 
 如果窗口正常弹出并可以输入反馈，说明 UI 组件工作正常。

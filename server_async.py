@@ -116,6 +116,12 @@ async def start_feedback(
         default=None, 
         description="预设选项列表，方便用户快速选择（可选）"
     ),
+    window_title: Optional[str] = Field(
+        default=None,
+        description="反馈窗口标题，建议传入当前会话的主题摘要，"
+                    "用于在反馈窗口标题栏显示。"
+                    "请保持简洁，建议不超过 30 个字符。"
+    ),
 ) -> Union[Tuple[Union[str, Image], ...], str]:
     """
     启动交互式反馈 UI 并等待用户完成
@@ -130,7 +136,7 @@ async def start_feedback(
     
     # 使用 launch_and_wait 异步等待用户反馈
     # 这会阻塞当前协程，但不会阻塞 Server 进程
-    result_dict = await launcher.launch_and_wait(message, predefined_options)
+    result_dict = await launcher.launch_and_wait(message, predefined_options, window_title)
     
     if not result_dict:
         logger.info("用户取消了反馈或发生错误")
@@ -147,6 +153,12 @@ def interactive_feedback(
         default=None,
         description="预设选项列表（可选）"
     ),
+    window_title: Optional[str] = Field(
+        default=None,
+        description="反馈窗口标题，建议传入当前会话的主题摘要，"
+                    "用于在反馈窗口标题栏显示。"
+                    "请保持简洁，建议不超过 30 个字符。"
+    ),
 ) -> Union[Tuple[Union[str, Image], ...], str]:
     """
     [兼容模式] 阻塞式交互反馈
@@ -162,7 +174,7 @@ def interactive_feedback(
     from server import launch_feedback_ui
     
     predefined_options_list = predefined_options if isinstance(predefined_options, list) else None
-    result_dict = launch_feedback_ui(message, predefined_options_list)
+    result_dict = launch_feedback_ui(message, predefined_options_list, window_title)
     
     return _parse_feedback_result(result_dict)
 

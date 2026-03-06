@@ -201,7 +201,7 @@ graph LR
 
 | 工具名 | 参数 | 返回值 | 说明 |
 |--------|------|--------|------|
-| `start_feedback` | `message: str`<br/>`predefined_options?: list` | `feedback_started:{request_id}`<br/>或 `feedback_error:{msg}` | 非阻塞启动 UI |
+| `start_feedback` | `message: str`<br/>`predefined_options?: list`<br/>`window_title?: str` | `feedback_started:{request_id}`<br/>或 `feedback_error:{msg}` | 非阻塞启动 UI |
 | `check_feedback` | `request_id: str` | `status:{pending\|completed\|cancelled\|expired\|error}` | 检查请求状态 |
 | `get_feedback` | `request_id: str` | 文本/图片元组 或 `error:{msg}` | 获取完成的结果 |
 | `cancel_feedback` | `request_id: str` | `cancelled:{request_id}`<br/>或 `error:{msg}` | 取消请求 |
@@ -526,7 +526,8 @@ class AsyncUILauncher:
         self,
         request_id: str,
         message: str,
-        predefined_options: Optional[List[str]] = None
+        predefined_options: Optional[List[str]] = None,
+        window_title: Optional[str] = None
     ) -> bool:
         """
         非阻塞启动反馈 UI
@@ -747,6 +748,10 @@ async def start_feedback(
         default=None, 
         description="预设选项列表，方便用户快速选择（可选）"
     ),
+    window_title: Optional[str] = Field(
+        default=None,
+        description="反馈窗口标题，建议传入当前会话的主题摘要（≤30字符）"
+    ),
 ) -> str:
     """
     启动交互式反馈 UI（非阻塞）
@@ -907,6 +912,10 @@ def interactive_feedback(
         default=None,
         description="预设选项列表（可选）"
     ),
+    window_title: Optional[str] = Field(
+        default=None,
+        description="反馈窗口标题，建议传入当前会话的主题摘要（≤30字符）"
+    ),
 ) -> Union[Tuple[Union[str, Image], ...], str]:
     """
     [兼容模式] 阻塞式交互反馈
@@ -920,7 +929,7 @@ def interactive_feedback(
     sys.path.insert(0, os.path.dirname(__file__))
     from server import launch_feedback_ui
     
-    result_dict = launch_feedback_ui(message, predefined_options)
+    result_dict = launch_feedback_ui(message, predefined_options, window_title)
     txt = result_dict.get("interactive_feedback", "").strip()
     img_b64_list = result_dict.get("images", [])
     
@@ -1085,7 +1094,8 @@ interactive-feedback-mcp/
 # 1. 启动反馈
 result = call_tool("start_feedback", {
     "message": "请确认要使用哪种排序算法？",
-    "predefined_options": ["快速排序", "归并排序", "堆排序"]
+    "predefined_options": ["快速排序", "归并排序", "堆排序"],
+    "window_title": "实现排序算法"
 })
 # result = "feedback_started:abc123"
 request_id = result.split(":")[1]
